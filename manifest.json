@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "id": "io.github.dadofsambonzuki.chezmoi-hound",
+  "id": "io.github.n4s5ti.chezmoi-hound",
   "name": "Chezmoi Hound",
-  "version": "1.2.1",
-  "author": "Nathan",
+  "version": "1.3.0",
+  "author": "Nathan, Lukas Westholt, n4s5ti",
   "license": "MIT",
-  "homepage": "https://github.com/dadofsambonzuki/chezmoi-hound",
-  "description": "A bar count of dotfile drift that hunts it down. It adds up what this machine has edited and the source has not captured, what the source repo has not committed, and what the remote has not seen - then the panel names the items and offers to push them, capture and commit them, apply the source to them, or stop managing them.",
+  "homepage": "https://github.com/n4s5ti/chezmoi-hound",
+  "description": "A bar count of dotfile drift that hunts it down. It adds up what this machine has edited and the source has not captured, what the source repo has not committed, and what the remote has not seen - then the panel names the items, shows their diff, and offers to push them, capture and commit them, apply the source to them, or stop managing them.",
   "kinds": [
     "bar-widget"
   ],
@@ -16,7 +16,7 @@
   },
   "barWidget": {
     "displayName": "Chezmoi Hound",
-    "description": "Dotfile drift across $HOME, the source repo and its remote, with push, capture-and-commit, apply-the-source and ignore actions.",
+    "description": "Dotfile drift across $HOME, the source repo and its remote, with an inline diff and push, capture-and-commit, apply-the-source and ignore actions.",
     "category": "System",
     "aliases": [
       "dotfiles",

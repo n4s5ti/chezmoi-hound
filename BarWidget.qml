@@ -22,8 +22,8 @@ import QtQuick.Controls as QQC
 // installed; the widget itself never shells out to git.
 Panel {
   id: root
-  moduleName: "io.github.dadofsambonzuki.chezmoi-hound"
-  ipcTarget: "io.github.dadofsambonzuki.chezmoi-hound"
+  moduleName: "io.github.n4s5ti.chezmoi-hound"
+  ipcTarget: "io.github.n4s5ti.chezmoi-hound"
   // manageIpc: false because this file owns the single IpcHandler the target
   // allows, so it can answer status()/geometry() as well as open/close.
   manageIpc: false
@@ -135,6 +135,12 @@ Panel {
   // The apply confirm - same shape, same reason for asking: it is the only
   // action here that writes to $HOME.
   property bool applying: false       // the apply-the-source confirm is open
+  // The inline diff, from Chezmoi Status: what the drift actually is, read on
+  // demand rather than on the timer - a diff is the expensive half of a reading
+  // and nobody looks at it unless they asked to.
+  property bool diffShown: false
+  property bool diffLoading: false
+  property string diffText: ""
 
   // -1 means "the record was there but was not a count", which is different
   // from 0 and must not be mistaken for a valid reading.
@@ -487,6 +493,29 @@ Panel {
     root.runAction("commit")
   }
 
+  // ---- the diff ------------------------------------------------------------
+  // A toggle, and read-only: the script takes no lock for it, so it can run
+  // beside an action without either waiting on the other. It is read again on
+  // every show rather than kept, because a diff from before the last commit is
+  // a diff of something that no longer exists.
+  function toggleDiff() {
+    if (root.diffShown) {
+      root.diffShown = false
+      return
+    }
+    root.diffShown = true
+    if (diffProc.running) return
+    root.diffLoading = true
+    root.diffText = ""
+    var args = [root.actScript, "diff"]
+    for (var i = 0; i < root.detail.length; i++) {
+      var p = String(root.detail[i]).replace(/^\s+/, "")
+      if (p !== "") args.push("--path", p)
+    }
+    diffProc.command = withSource(["/usr/bin/timeout", "-k", "2", "60"].concat(args))
+    diffProc.running = true
+  }
+
   // There is one bar surface per monitor, so there is one of us per screen. An
   // action lands on the instance that was clicked; the others are told to
   // re-check, or the other monitor keeps showing the count from before it.
@@ -670,6 +699,29 @@ Panel {
     }
   }
 
+  Process {
+    id: diffProc
+    stdout: StdioCollector {
+      id: diffOut
+      waitForEnd: true
+    }
+    stderr: StdioCollector {
+      id: diffErr
+      waitForEnd: true
+    }
+    onExited: function (exitCode, exitStatus) {
+      root.diffLoading = false
+      var out = String(diffOut.text || "")
+      if (out.length > root.maxBytes) out = out.slice(0, root.maxBytes)
+      if (exitCode === 0) {
+        root.diffText = out.replace(/\s+$/, "")
+      } else {
+        var err = String(diffErr.text || out || "").trim()
+        root.diffText = err !== "" ? err : "chezmoi diff exited " + exitCode
+      }
+    }
+  }
+
   // ---- the message entry's three processes ---------------------------------
   //
   // Two questions, one script: is there anything here that could write a message,
@@ -749,6 +801,7 @@ Panel {
         // screen, so closing drops it. The target stays: Retry is still the last
         // action that ran.
         root.undoRow = ""
+        root.diffShown = false
         return
       }
       if (probeProc.running) return
@@ -897,6 +950,60 @@ Panel {
               bordered: true
               opacity: root.running === "" ? 1 : 0.45
               onClicked: root.askApply()
+            }
+
+            Button {
+              // Read-only, so it stays live while an action runs.
+              visible: root.homeCount > 0 || root.repoCount > 0
+              text: root.diffShown ? "Hide diff" : "Show diff"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              fontSize: Style.font.bodySmall
+              horizontalPadding: Style.spacing.controlPaddingX
+              verticalPadding: Style.spacing.controlPaddingY
+              bordered: true
+              onClicked: root.toggleDiff()
+            }
+          }
+
+          // The diff itself, in chezmoi's direction: a "-" line is what this
+          // machine has, a "+" line is what applying the source would write.
+          // Capped in height so a long diff scrolls inside the panel instead of
+          // pushing the actions off the screen.
+          Column {
+            width: parent.width
+            spacing: Style.space(6)
+            visible: root.diffShown
+
+            PanelSectionHeader {
+              text: "DIFF \u2014 \u2212 here, + the source"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              color: root.sectionTitleColor
+            }
+
+            Flickable {
+              id: diffFlick
+              width: parent.width
+              height: Math.min(diffBody.implicitHeight, Style.space(280))
+              contentWidth: width
+              contentHeight: diffBody.implicitHeight
+              clip: true
+              boundsBehavior: Flickable.StopAtBounds
+              interactive: contentHeight > height
+              QQC.ScrollBar.vertical: QQC.ScrollBar { policy: QQC.ScrollBar.AsNeeded }
+
+              Text {
+                id: diffBody
+                width: diffFlick.width
+                textFormat: Text.PlainText
+                text: root.diffLoading ? "Running chezmoi diff…" : root.diffText
+                color: root.bar.foreground
+                opacity: 0.75
+                wrapMode: Text.WrapAnywhere
+                font.family: "monospace"
+                font.pixelSize: Style.font.bodySmall
+              }
             }
           }
 
@@ -1600,7 +1707,7 @@ Panel {
   // points the buttons call, so an action can be exercised without a synthetic
   // click.
   IpcHandler {
-    target: "io.github.dadofsambonzuki.chezmoi-hound"
+    target: "io.github.n4s5ti.chezmoi-hound"
 
     function open(): void { root.open() }
     function close(): void { root.close() }
@@ -1710,6 +1817,7 @@ Panel {
     // Full details is a button; this is the scriptable path to the same
     // floating terminal, so the read-out can be opened without a click.
     function details(): void { root.showDetails() }
+    function diff(): void { root.toggleDiff() }
 
     // The same write the panel's own fields make, so the path can be
     // exercised without a hand on the mouse.
