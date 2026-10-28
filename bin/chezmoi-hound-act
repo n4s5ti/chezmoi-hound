@@ -82,7 +82,7 @@ sha=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        commit|push|suggest|undo|ignore|apply)
+        commit|push|suggest|undo|ignore|apply|diff)
             [ -n "$action" ] || action="$1"
             shift
             ;;
@@ -135,7 +135,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$action" ]; then
-    echo "usage: chezmoi-hound-act commit | push | suggest | ignore | apply [--source DIR] [--path TARGET]... [--dry-run]"
+    echo "usage: chezmoi-hound-act commit | push | suggest | ignore | apply | diff [--source DIR] [--path TARGET]... [--dry-run]"
     exit 2
 fi
 
@@ -193,7 +193,7 @@ private_dir() {
     return 1
 }
 
-if [ "$action" != "suggest" ] && command -v flock >/dev/null 2>&1; then
+if [ "$action" != "suggest" ] && [ "$action" != "diff" ] && command -v flock >/dev/null 2>&1; then
     if lockdir=$(private_dir); then
         lockfile="$lockdir/act.lock"
         (umask 077; set -C; : >"$lockfile") 2>/dev/null || true
@@ -1007,6 +1007,47 @@ case "$action" in
         [ "$failed" -eq 0 ] || exit 1
         ;;
 
+    diff)
+        # What the drift actually is, for the panel's Show diff - the part of
+        # Chezmoi Status (LukasWestholt/omarchy-chezmoi-barwidget) this plugin
+        # did not have. Read-only, so it takes no lock: it must not wait on, or
+        # hold up, a commit that is running. The same `-x scripts` filter as
+        # drift_preview, for the same reason - a due run script is not drift and
+        # its whole body would bury the files that are. Bounded, because this is
+        # a panel and not a pager; Full details is the place for the rest.
+        #
+        # Only the paths named, or failing that every drifted target: the panel
+        # names the ones it is showing, so the diff matches the list above it.
+        cap=40000
+        work=$(mktemp -d "${TMPDIR:-/tmp}/chezmoi-hound-diff.XXXXXX") || exit 3
+        trap 'rm -rf "$work"' EXIT INT TERM
+        if [ -n "${paths:-}" ]; then
+            printf '%s\n' "$paths" >"$work/want"
+        else
+            status_paths >"$work/want"
+        fi
+        : >"$work/out"
+        while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            p=${p#./}
+            [ -n "$p" ] || continue
+            chez --no-tty --no-pager diff -x scripts "$HOME/$p" >>"$work/out" 2>/dev/null
+        done <"$work/want"
+        if [ -n "$(gitrepo status --porcelain 2>/dev/null)" ]; then
+            printf '\n# uncommitted in the source repo (%s)\n' "$srcdir" >>"$work/out"
+            gitrepo --no-pager diff HEAD >>"$work/out" 2>/dev/null
+        fi
+        if [ ! -s "$work/out" ]; then
+            echo "No differences."
+            exit 0
+        fi
+        head -c "$cap" "$work/out"
+        size=$(wc -c <"$work/out")
+        if [ "$size" -gt "$cap" ]; then
+            printf '\n... cut at %s of %s bytes - Full details has the rest\n' "$cap" "$size"
+        fi
+        ;;
+
     push)
         upstream=$(gitrepo rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) || upstream=""
         if [ -z "$upstream" ]; then
@@ -1134,7 +1175,7 @@ case "$action" in
         ;;
 
     *)
-        echo "usage: chezmoi-hound-act commit | push | suggest | ignore | undo --commit SHA [--source DIR] [--path TARGET]... [--dry-run] [--message TEXT] [--ai COMMAND]"
+        echo "usage: chezmoi-hound-act commit | push | suggest | ignore | apply | diff | undo --commit SHA [--source DIR] [--path TARGET]... [--dry-run] [--message TEXT] [--ai COMMAND]"
         exit 2
         ;;
 esac

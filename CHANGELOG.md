@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.0
+
+- **Merged with Chezmoi Status.** n4s5ti's fork folds
+  [LukasWestholt/omarchy-chezmoi-barwidget](https://github.com/LukasWestholt/omarchy-chezmoi-barwidget)
+  into Hound. The only capability Hound lacked was its inline diff, so that is what
+  came over: a **Show diff** button in the drift section, backed by a new read-only
+  `chezmoi-hound-act diff` that takes no lock, filters run scripts like the
+  suggestion preview does, and caps its output at 40 KB. The rest of Chezmoi Status
+  was already here, so it was deduplicated rather than copied.
+- The plugin id is now `io.github.n4s5ti.chezmoi-hound`, so it can sit beside an
+  upstream install without colliding.
+
 ## 1.2.1
 
 - **A generation hermes has not leased yet no longer kills the leg.** 1.1.8 gave the

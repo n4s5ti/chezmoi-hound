@@ -1,4 +1,13 @@
-> **This GitHub repository is a read-only mirror.**
+> **This is n4s5ti's fork, combining two chezmoi bar widgets into one.** It is
+> [Chezmoi Hound](https://github.com/dadofsambonzuki/chezmoi-hound) with the one
+> capability [Chezmoi Status](https://github.com/LukasWestholt/omarchy-chezmoi-barwidget)
+> had that Hound did not: an inline **Show diff** in the panel. Everything else
+> Chezmoi Status did - the count, refresh, a missing-chezmoi warning, apply - Hound
+> already covered, so only the diff was brought over (Hound's per-path apply, which
+> never overwrites a file edited here, replaces Chezmoi Status's whole-tree
+> `chezmoi apply`). Upstream's note follows.
+>
+> **Upstream: this GitHub repository is a read-only mirror.**
 >
 > The canonical home is [https://gitworkshop.dev/nathan@day.ag/chezmoi-hound](https://gitworkshop.dev/nathan@day.ag/chezmoi-hound). Clone it with Git and Nostr:
 > `git clone nostr://nathan@day.ag/chezmoi-hound`
@@ -28,7 +37,7 @@ Clicking the number shows you a list of the drifted files and/or local commits, 
 Omarchy 4 (Quattro) with the Omarchy shell:
 
 ```sh
-omarchy plugin add https://github.com/dadofsambonzuki/chezmoi-hound.git --enable --yes
+omarchy plugin add https://github.com/n4s5ti/chezmoi-hound.git --enable --yes
 ```
 
 That clones the plugin, registers it with the shell and enables it. The count
@@ -68,7 +77,7 @@ button is not offered at all.
 ## Remove
 
 ```sh
-omarchy plugin remove io.github.dadofsambonzuki.chezmoi-hound --yes
+omarchy plugin remove io.github.n4s5ti.chezmoi-hound --yes
 ```
 
 That unregisters the widget and deletes the plugin directory. Nothing else on the
@@ -96,6 +105,7 @@ layout in `~/.config/omarchy/shell.json`, which Omarchy writes itself.
 | **Capture and commit** | opens a **blank commit message** entry, then `chezmoi add` each edited target and one local commit |
 | **Add to .chezmoiignore** | the other answer to the same list: after a confirm, the named targets go into the source's `.chezmoiignore` so chezmoi stops managing and counting them. Nothing in your home is touched — see below |
 | **Apply the source** | the third answer, and the one for a file chezmoi generates itself: after a confirm, the source's version of the named targets goes back into your home. The only action here that writes to your home — an edited path is reported, not overwritten |
+| **Show diff** | read-only: `chezmoi diff` for the drifted paths the panel lists, plus the source repo's uncommitted diff, inline and capped at 40 KB. `-` lines are what this machine has, `+` lines what applying the source would write. Run scripts are left out |
 | **Suggest** | asks your default agent to write the message from the diff. Only shown when an agent can answer it, and only ever called by that button |
 | **undo** arrow on a commit row | takes that commit back, after asking: it repeats the row and says what taking it back means for it |
 
